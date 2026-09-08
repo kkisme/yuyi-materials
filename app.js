@@ -61,8 +61,8 @@ function showData(payload,mode){
   $('#sync').textContent=`读取 ${timeText(data.readAt)} · ${mode==='live'?'实时台账':'备用快照'}${stale?'（已过期）':''}`;
 }
 async function refresh(){
-  if(loading)return;loading=true;$('#refresh').disabled=true;
-  $('#refresh').setAttribute('aria-busy','true');
+  if(loading)return;loading=true;
+  $('#sync').setAttribute('aria-busy','true');
   try{
     let liveSucceeded=false;
     const live=readJSON(ENDPOINT).then(v=>{liveSucceeded=true;showData(v,'live');return v;}).catch(()=>null);
@@ -74,10 +74,10 @@ async function refresh(){
     return true;
   }catch{
     $('#sync').classList.add('error');
-    $('#sync').textContent=data?`暂无法读取最新数据，保留 ${timeText(data.readAt)} 的结果。下拉或点击刷新重试。`:'暂时无法读取台账，请下拉或点击刷新重试。';
+    $('#sync').textContent=data?`暂无法读取最新数据，保留 ${timeText(data.readAt)} 的结果。下拉刷新重试。`:'暂时无法读取台账，请下拉刷新重试。';
     if(!data)$('#dashboard').innerHTML='<section class="loading">数据尚未加载<br><br>网络恢复后会自动重试</section>';
     return false;
-  }finally{loading=false;$('#refresh').disabled=false;$('#refresh').removeAttribute('aria-busy');}
+  }finally{loading=false;$('#sync').removeAttribute('aria-busy');}
 }
 // 只接管页面顶部的单指向下手势；普通滚动、横向移动和多指缩放保持原生行为。
 const pull = $('#pull-refresh'), pullLabel = $('#pull-label');
@@ -111,6 +111,5 @@ $('#main').addEventListener('touchcancel',resetPull,{passive:true});
 document.querySelectorAll('[data-station]').forEach(button=>button.addEventListener('click',()=>{station=button.dataset.station;document.querySelectorAll('[data-station]').forEach(b=>{b.classList.toggle('selected',b===button);b.setAttribute('aria-pressed',String(b===button));});render();}));
 function tab(name){document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===name);if(b.dataset.tab===name)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});const water=name==='water';$('#main').hidden=!water;$('#future').hidden=water;if(!water){const label=name==='asphalt'?'沥青':'混凝土';$('#future').innerHTML=`<span class="future-icon">${icon(name==='asphalt'?'road':'cube')}</span><h1>${label}混合料</h1><p>原材消耗统计即将接入<br>当前可查看水稳原材数据</p><button id="back-water">查看水稳统计</button>`;$('#back-water').onclick=()=>tab('water');}window.scrollTo({top:0,behavior:'instant'});}
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
-$('#refresh').addEventListener('click',refresh);
 try{const saved=localStorage.getItem('yuyi-materials-v1');if(saved){data=validate(JSON.parse(saved));render();$('#sync').textContent=`本地缓存 ${timeText(data.readAt)} · 正在读取最新数据`;}}catch{}
 refresh();setInterval(()=>{if(!document.hidden)refresh();},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});window.addEventListener('online',refresh);
