@@ -1,0 +1,38 @@
+name: Publish dashboard and ledger snapshot
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '3-58/5 * * * *'
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: material-pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Read and validate current ledger statistics
+        env:
+          WPS_WEBHOOK: ${{ secrets.WPS_WEBHOOK }}
+          WPS_TOKEN: ${{ secrets.WPS_TOKEN }}
+        run: python3 scripts/snapshot.py
+      - name: Prepare public files only
+        run: |
+          mkdir public
+          cp index.html app.js style.css data.json public/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+      - uses: actions/deploy-pages@v4
+        id: deployment

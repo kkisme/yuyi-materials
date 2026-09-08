@@ -31,17 +31,30 @@ function render(){
   expanded.forEach(i=>{const el=document.querySelectorAll('#dashboard details')[i];if(el)el.open=true;});
 }
 function timeText(t){return new Date(t).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});}
+async function readJSON(url){
+  const controller=typeof AbortController==='function'?new AbortController():null;
+  let timer;
+  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{if(controller)controller.abort();reject(Error('读取超时'));},20000);});
+  try{return await Promise.race([fetch(url,{cache:'no-store',...(controller?{signal:controller.signal}:{})}).then(async r=>{if(!r.ok)throw Error('HTTP '+r.status);return validate(await r.json());}),timeout]);}finally{clearTimeout(timer);}
+}
+function showData(payload,mode){
+  if(!data || Date.parse(payload.readAt)>=Date.parse(data.readAt)){data=payload;render();try{localStorage.setItem('yuyi-materials-v1',JSON.stringify(data));}catch{}}
+  const stale=Date.now()-Date.parse(data.readAt)>(mode==='live'?180000:900000);
+  $('#status').textContent=stale?'数据待更新':mode==='live'?'已连接台账':'备用数据';
+  $('#status').classList.toggle('error',stale);
+  $('#sync').textContent=`读取于 ${timeText(data.readAt)} · ${mode==='live'?'每分钟自动刷新':'备用快照，约每 5 分钟同步（可能延迟）'}${stale?' · 当前数据已过期':''}`;
+}
 async function refresh(){
   if(loading)return;loading=true;$('#refresh').disabled=true;
   $('#status').textContent='读取中';
   try{
-    const response=await fetch(ENDPOINT,{cache:'no-store',signal:AbortSignal.timeout(25000)});
-    if(!response.ok)throw Error('服务暂时不可用');
-    data=validate(await response.json());render();
-    try{localStorage.setItem('yuyi-materials-v1',JSON.stringify(data));}catch{}
-    const stale=Date.now()-Date.parse(data.readAt)>180000;
-    $('#status').textContent=stale?'数据待更新':'已连接台账';$('#status').classList.toggle('error',stale);
-    $('#sync').textContent=`读取于 ${timeText(data.readAt)} · 每分钟自动刷新${stale?' · 当前为缓存数据':''}`;
+    let liveSucceeded=false;
+    const live=readJSON(ENDPOINT).then(v=>{liveSucceeded=true;showData(v,'live');return v;}).catch(()=>null);
+    const backup=readJSON('./data.json?t='+Date.now()).then(v=>{if(!liveSucceeded)showData(v,'snapshot');return v;}).catch(()=>null);
+    const results=await Promise.all([live,backup]);
+    if(results[0])showData(results[0],'live');
+    else if(results[1])showData(results[1],'snapshot');
+    else throw Error('两个数据通道均不可用');
   }catch{
     $('#status').textContent=data?'更新失败':'连接失败';$('#status').classList.add('error');
     $('#sync').textContent=data?`暂无法读取最新数据，保留 ${timeText(data.readAt)} 的结果。点击右上角重试。`:'暂时无法读取台账，请点击右上角重试。';
