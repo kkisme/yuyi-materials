@@ -4,6 +4,20 @@ const fmt = n => new Intl.NumberFormat('zh-CN',{minimumFractionDigits:2,maximumF
 const signed = n => `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n))}`;
 let data, station = 'all', loading = false;
 const names = ['水泥','石屑','5–10 mm','10–20 mm','20–25 mm','20–30 mm'];
+// 统一 24px 线性图标，避免字符图标在不同手机上显示不一致。
+const iconPaths = {
+  layers:'<path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/>',
+  road:'<path d="m7 3-3 18M17 3l3 18M12 3v3m0 4v4m0 4v3"/>',
+  cube:'<path d="m12 3 9 5v9l-9 5-9-5V8Z"/><path d="m3 8 9 5 9-5M12 13v9M7.5 5.5l9 5"/>',
+  refresh:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 11.6-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"/>',
+  chevron:'<path d="m9 5 7 7-7 7"/>',
+  bag:'<path d="m8 3 1 4-4 6v7h14v-7l-4-6 1-4ZM9 7h6M9 14h6M12 11v6"/>',
+  stone:'<path d="m3 15 4-9 8-2 6 10-5 6H7Z"/><path d="m7 6 4 7 10 1M11 13l-4 7m4-7 5 7"/>',
+  check:'<path d="M9 3H5v18h14V3h-4M9 3v4h6V3ZM8 14l3 3 5-6"/>'
+};
+function icon(name){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name]||iconPaths.layers}</svg>`;}
+document.querySelectorAll('[data-icon]').forEach(el=>{el.innerHTML=icon(el.dataset.icon);});
+
 function validate(payload) {
   if (!payload.success || !Array.isArray(payload.rows) || payload.rows.length < 16 || !Number.isFinite(Date.parse(payload.readAt))) throw Error('数据格式异常');
   const rows = payload.rows;
@@ -22,12 +36,15 @@ function values(col){
   for(const s of selected){const r=3+s*6; total.theory+=value(r,col);total.self+=value(r+1,col);total.selfBatches+=value(r+2,col);total.external+=value(r+3,col);total.externalBatches+=value(r+4,col);}
   total.incoming=total.self+total.external;total.delta=total.incoming-total.theory;return total;
 }
-function material(i){const v=values(i+2),max=Math.max(v.incoming,v.theory,1);return `<details class="material"><summary><div class="material-title"><div class="material-name"><span class="num">0${i+1}</span>${names[i]}</div><span class="pill ${v.delta<0?'negative':''}">差值 ${signed(v.delta)}</span></div><div class="material-values"><div><span>进场量 / t</span><b>${fmt(v.incoming)}</b></div><div><span>理论消耗 / t</span><b>${fmt(v.theory)}</b></div></div><div class="bars" aria-hidden="true"><div class="bar-track"><i style="width:${v.incoming/max*100}%"></i></div><div class="bar-track"><i class="theory" style="width:${v.theory/max*100}%"></i></div></div><span class="expand-hint">自检 / 外委明细 ⌄</span></summary><div class="detail-grid"><div><span>自检进场量</span><b>${fmt(v.self)}</b><small>t</small></div><div><span>外委进场量</span><b>${fmt(v.external)}</b><small>t</small></div><div><span>自检批次</span><b>${v.selfBatches}</b><small>批</small></div><div><span>外委批次</span><b>${v.externalBatches}</b><small>批</small></div></div></details>`;}
+function material(i){
+  const v=values(i+2);
+  return `<details class="material"><summary><div class="material-title"><span class="material-icon">${icon(i===0?'bag':'stone')}</span><div class="material-name">${names[i]}<small>${i===0?'胶结材料':i===1?'细集料':'碎石集料'}</small></div><span class="detail-action">明细 ${icon('chevron')}</span></div><div class="material-values"><div><span>累计进场</span><b>${fmt(v.incoming)}</b></div><div><span>理论消耗</span><b>${fmt(v.theory)}</b></div><div class="difference ${v.delta<0?'negative':''}"><span>差值</span><b>${signed(v.delta)}</b></div></div></summary><div class="detail-grid"><div><span>自检进场量</span><b>${fmt(v.self)}</b><small>t</small></div><div><span>外委进场量</span><b>${fmt(v.external)}</b><small>t</small></div><div><span>自检批次</span><b>${v.selfBatches}</b><small>批</small></div><div><span>外委批次</span><b>${v.externalBatches}</b><small>批</small></div></div></details>`;
+}
 function render(){
   if(!data)return;
   const expanded = [...document.querySelectorAll('#dashboard details')].map((el,i)=>el.open?i:-1).filter(i=>i>=0);
   const v=values(9),agg=values(8);
-  $('#dashboard').innerHTML=`<section class="hero" aria-label="${station==='all'?'全部站点':Number(station)+1+'号站'}总览"><div class="hero-top"><span>累计进场总量</span><span class="unit-badge">TONNES</span></div><div class="hero-number">${fmt(v.incoming)}<small>t</small></div><div class="hero-bottom"><div><span>理论总消耗 / t</span><strong>${fmt(v.theory)}</strong></div><div><span>进场 − 理论 / t</span><strong class="delta">${signed(v.delta)}</strong></div></div></section><div class="metrics"><section class="metric"><label>自检进场量</label><strong>${fmt(v.self)}<small>t</small></strong><footer><b>${v.selfBatches}</b> 批次 · 占进场 ${v.incoming?(v.self/v.incoming*100).toFixed(1):'0.0'}%</footer></section><section class="metric"><label>外委进场量</label><strong>${fmt(v.external)}<small>t</small></strong><footer><b>${v.externalBatches}</b> 批次 · 占进场 ${v.incoming?(v.external/v.incoming*100).toFixed(1):'0.0'}%</footer></section></div><div class="section-head"><h2>材料明细</h2><span>6 类材料 · 单位 t</span></div><div class="legend"><span><i></i>实际进场</span><span><i class="theory"></i>理论消耗</span></div><div class="materials">${names.map((_,i)=>material(i)).join('')}</div><div class="aggregate"><div>集料进场合计<span>石屑 + 各规格碎石，不含水泥</span></div><strong>${fmt(agg.incoming)} <small>t</small></strong></div><details class="notes"><summary>统计口径与数据来源 ⌄</summary><p>进场总量 = 自检进场量 + 外委进场量。差值 = 进场总量 − 理论消耗。差值为统计量差额，不代表实盘库存或损耗率。</p><p>自检水泥按用途“底基层、基层”统计；外委统一按 X 列“水稳混合料”筛选，并只统计有有效代表数量的记录。每条有效记录计一个批次。全部站点为 1# 与 2# 之和。</p><p>页面每 60 秒尝试读取统计表当前值；实时通道不可达时显示同域备用快照，备用同步计划为每 5 分钟一次，可能延迟。读取时间不代表源台账最后修改时间。跨表引用的新数据须在金山文档完成“更新引用”，本页才会显示更新后的结果。</p><a href="https://www.kdocs.cn/l/clnD16go2o5m" target="_blank" rel="noopener noreferrer">打开施工台账 ↗</a></details>`;
+  $('#dashboard').innerHTML=`<section class="hero" aria-label="${station==='all'?'全部站点':Number(station)+1+'号站'}总览"><div class="hero-top"><span>累计进场总量</span><span class="unit-badge">${station==='all'?'全部站点':Number(station)+1+'# 拌合站'}</span></div><div class="hero-number">${fmt(v.incoming)}<small>t</small></div><div class="hero-bottom"><div><span>理论总消耗 / t</span><strong>${fmt(v.theory)}</strong></div><div><span>进场 − 理论 / t</span><strong class="delta">${signed(v.delta)}</strong></div></div></section><details class="inspection"><summary><span class="inspection-label">${icon('check')} 检验统计</span><span class="inspection-count">自检 ${v.selfBatches} 批 · 外委 ${v.externalBatches} 批</span>${icon('chevron')}</summary><div class="metrics"><section class="metric"><label>自检进场量</label><strong>${fmt(v.self)}<small>t</small></strong><footer><b>${v.selfBatches}</b> 批次 · 占进场 ${v.incoming?(v.self/v.incoming*100).toFixed(1):'0.0'}%</footer></section><section class="metric"><label>外委进场量</label><strong>${fmt(v.external)}<small>t</small></strong><footer><b>${v.externalBatches}</b> 批次 · 占进场 ${v.incoming?(v.external/v.incoming*100).toFixed(1):'0.0'}%</footer></section></div></details><div class="section-head"><h2>材料明细</h2><span>6 类材料 / 单位 t</span></div><p class="section-caption">差值 = 进场 − 理论消耗，不代表库存</p><div class="materials">${names.map((_,i)=>material(i)).join('')}</div><div class="aggregate"><div>集料进场合计<span>石屑 + 各规格碎石，不含水泥</span></div><strong>${fmt(agg.incoming)} <small>t</small></strong></div><details class="notes"><summary>统计口径与数据来源 ⌄</summary><p>进场总量 = 自检进场量 + 外委进场量。差值 = 进场总量 − 理论消耗。差值为统计量差额，不代表实盘库存或损耗率。</p><p>自检水泥按用途“底基层、基层”统计；外委统一按 X 列“水稳混合料”筛选，并只统计有有效代表数量的记录。每条有效记录计一个批次。全部站点为 1# 与 2# 之和。</p><p>页面每 60 秒尝试读取统计表当前值；实时通道不可达时显示同域备用快照，备用同步计划为每 5 分钟一次，可能延迟。读取时间不代表源台账最后修改时间。跨表引用的新数据须在金山文档完成“更新引用”，本页才会显示更新后的结果。</p><a href="https://www.kdocs.cn/l/clnD16go2o5m" target="_blank" rel="noopener noreferrer">打开施工台账 ↗</a></details>`;
   expanded.forEach(i=>{const el=document.querySelectorAll('#dashboard details')[i];if(el)el.open=true;});
 }
 function timeText(t){return new Date(t).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});}
@@ -42,7 +59,7 @@ function showData(payload,mode){
   const stale=Date.now()-Date.parse(data.readAt)>(mode==='live'?180000:900000);
   $('#status').textContent=stale?'数据待更新':mode==='live'?'已连接台账':'备用数据';
   $('#status').classList.toggle('error',stale);
-  $('#sync').textContent=`读取于 ${timeText(data.readAt)} · ${mode==='live'?'每分钟自动刷新':'备用快照，约每 5 分钟同步（可能延迟）'}${stale?' · 当前数据已过期':''}`;
+  $('#sync').textContent=`读取 ${timeText(data.readAt)} · ${mode==='live'?'实时台账':'备用快照'}${stale?'（已过期）':''}`;
 }
 async function refresh(){
   if(loading)return;loading=true;$('#refresh').disabled=true;
@@ -62,7 +79,7 @@ async function refresh(){
   }finally{loading=false;$('#refresh').disabled=false;}
 }
 document.querySelectorAll('[data-station]').forEach(button=>button.addEventListener('click',()=>{station=button.dataset.station;document.querySelectorAll('[data-station]').forEach(b=>{b.classList.toggle('selected',b===button);b.setAttribute('aria-pressed',String(b===button));});render();}));
-function tab(name){document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===name);if(b.dataset.tab===name)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});const water=name==='water';$('#main').hidden=!water;$('#future').hidden=water;if(!water){const label=name==='asphalt'?'沥青':'混凝土';$('#future').innerHTML=`<span class="future-icon">${name==='asphalt'?'≋':'▦'}</span><h1>${label}混合料</h1><p>原材消耗统计即将接入<br>当前可查看水稳原材数据</p><button id="back-water">查看水稳统计</button>`;$('#back-water').onclick=()=>tab('water');}window.scrollTo({top:0,behavior:'instant'});}
+function tab(name){document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===name);if(b.dataset.tab===name)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});const water=name==='water';$('#main').hidden=!water;$('#future').hidden=water;if(!water){const label=name==='asphalt'?'沥青':'混凝土';$('#future').innerHTML=`<span class="future-icon">${icon(name==='asphalt'?'road':'cube')}</span><h1>${label}混合料</h1><p>原材消耗统计即将接入<br>当前可查看水稳原材数据</p><button id="back-water">查看水稳统计</button>`;$('#back-water').onclick=()=>tab('water');}window.scrollTo({top:0,behavior:'instant'});}
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
 $('#refresh').addEventListener('click',refresh);
 try{const saved=localStorage.getItem('yuyi-materials-v1');if(saved){data=validate(JSON.parse(saved));render();$('#sync').textContent=`本地缓存 ${timeText(data.readAt)} · 正在读取最新数据`;}}catch{}
