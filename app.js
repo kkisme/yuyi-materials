@@ -57,13 +57,12 @@ async function readJSON(url){
 function showData(payload,mode){
   if(!data || Date.parse(payload.readAt)>=Date.parse(data.readAt)){data=payload;render();try{localStorage.setItem('yuyi-materials-v1',JSON.stringify(data));}catch{}}
   const stale=Date.now()-Date.parse(data.readAt)>(mode==='live'?180000:900000);
-  $('#status').textContent=stale?'数据待更新':mode==='live'?'已连接台账':'备用数据';
-  $('#status').classList.toggle('error',stale);
+  $('#sync').classList.toggle('error',stale);
   $('#sync').textContent=`读取 ${timeText(data.readAt)} · ${mode==='live'?'实时台账':'备用快照'}${stale?'（已过期）':''}`;
 }
 async function refresh(){
   if(loading)return;loading=true;$('#refresh').disabled=true;
-  $('#status').textContent='读取中';
+  $('#refresh').setAttribute('aria-busy','true');
   try{
     let liveSucceeded=false;
     const live=readJSON(ENDPOINT).then(v=>{liveSucceeded=true;showData(v,'live');return v;}).catch(()=>null);
@@ -72,12 +71,43 @@ async function refresh(){
     if(results[0])showData(results[0],'live');
     else if(results[1])showData(results[1],'snapshot');
     else throw Error('两个数据通道均不可用');
+    return true;
   }catch{
-    $('#status').textContent=data?'更新失败':'连接失败';$('#status').classList.add('error');
-    $('#sync').textContent=data?`暂无法读取最新数据，保留 ${timeText(data.readAt)} 的结果。点击右上角重试。`:'暂时无法读取台账，请点击右上角重试。';
+    $('#sync').classList.add('error');
+    $('#sync').textContent=data?`暂无法读取最新数据，保留 ${timeText(data.readAt)} 的结果。下拉或点击刷新重试。`:'暂时无法读取台账，请下拉或点击刷新重试。';
     if(!data)$('#dashboard').innerHTML='<section class="loading">数据尚未加载<br><br>网络恢复后会自动重试</section>';
-  }finally{loading=false;$('#refresh').disabled=false;}
+    return false;
+  }finally{loading=false;$('#refresh').disabled=false;$('#refresh').removeAttribute('aria-busy');}
 }
+// 只接管页面顶部的单指向下手势；普通滚动、横向移动和多指缩放保持原生行为。
+const pull = $('#pull-refresh'), pullLabel = $('#pull-label');
+let pullStart = null, pullDistance = 0, pullBusy = false;
+function resetPull(){pullStart=null;pullDistance=0;if(!pullBusy){pull.style.height='0px';pull.classList.remove('dragging','refreshing');}}
+$('#main').addEventListener('touchstart',event=>{
+  if(event.touches.length!==1){resetPull();return;}
+  if(loading||pullBusy||window.scrollY>0)return;
+  const t=event.touches[0];pullStart={x:t.clientX,y:t.clientY};pullDistance=0;
+},{passive:true});
+$('#main').addEventListener('touchmove',event=>{
+  if(!pullStart)return;
+  if(event.touches.length!==1||window.scrollY>0){resetPull();return;}
+  const t=event.touches[0],dy=t.clientY-pullStart.y,dx=Math.abs(t.clientX-pullStart.x);
+  if(dy<=0||dx>Math.max(12,dy)){resetPull();return;}
+  if(dy<8)return;
+  if(event.cancelable)event.preventDefault();
+  pullDistance=Math.min(88,dy*.5);pull.classList.add('dragging');pull.style.height=pullDistance+'px';
+  pullLabel.textContent=pullDistance>=64?'松开刷新':'下拉刷新';
+},{passive:false});
+$('#main').addEventListener('touchend',async()=>{
+  if(!pullStart)return;
+  const ready=pullDistance>=64;pullStart=null;
+  if(!ready||loading){resetPull();return;}
+  pullBusy=true;pull.classList.remove('dragging');pull.classList.add('refreshing');pull.style.height='54px';pullLabel.textContent='正在刷新…';
+  try{const ok=await refresh();pullLabel.textContent=ok?'已重新读取数据':'刷新失败，请重试';}
+  finally{pull.classList.remove('refreshing');setTimeout(()=>{pullBusy=false;resetPull();},1000);}
+},{passive:true});
+$('#main').addEventListener('touchcancel',resetPull,{passive:true});
+
 document.querySelectorAll('[data-station]').forEach(button=>button.addEventListener('click',()=>{station=button.dataset.station;document.querySelectorAll('[data-station]').forEach(b=>{b.classList.toggle('selected',b===button);b.setAttribute('aria-pressed',String(b===button));});render();}));
 function tab(name){document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===name);if(b.dataset.tab===name)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});const water=name==='water';$('#main').hidden=!water;$('#future').hidden=water;if(!water){const label=name==='asphalt'?'沥青':'混凝土';$('#future').innerHTML=`<span class="future-icon">${icon(name==='asphalt'?'road':'cube')}</span><h1>${label}混合料</h1><p>原材消耗统计即将接入<br>当前可查看水稳原材数据</p><button id="back-water">查看水稳统计</button>`;$('#back-water').onclick=()=>tab('water');}window.scrollTo({top:0,behavior:'instant'});}
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
