@@ -9,7 +9,7 @@ const iconPaths = {
   layers:'<path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/>',
   road:'<path d="m7 3-3 18M17 3l3 18M12 3v3m0 4v4m0 4v3"/>',
   cube:'<path d="m12 3 9 5v9l-9 5-9-5V8Z"/><path d="m3 8 9 5 9-5M12 13v9M7.5 5.5l9 5"/>',
-  refresh:'<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 11.6-1L20 9M4 15l2.4 3A7 7 0 0 0 18 17"/>',
+  refresh:'<path d="M20 7v5h-5"/><path d="M20 12a8 8 0 1 0-2.35 5.65M20 7v5"/>',
   chevron:'<path d="m9 5 7 7-7 7"/>',
   bag:'<path d="m8 3 1 4-4 6v7h14v-7l-4-6 1-4ZM9 7h6M9 14h6M12 11v6"/>',
   stone:'<path d="m3 15 4-9 8-2 6 10-5 6H7Z"/><path d="m7 6 4 7 10 1M11 13l-4 7m4-7 5 7"/>',
