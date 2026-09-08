@@ -38,7 +38,7 @@ function values(col){
 }
 function material(i){
   const v=values(i+2);
-  return `<details class="material"><summary><div class="material-title"><span class="material-icon">${icon(i===0?'bag':'stone')}</span><div class="material-name">${names[i]}<small>${i===0?'胶结材料':i===1?'细集料':'碎石集料'}</small></div><span class="detail-action">明细 ${icon('chevron')}</span></div><div class="material-values"><div><span>累计进场</span><b>${fmt(v.incoming)}</b></div><div><span>理论消耗</span><b>${fmt(v.theory)}</b></div><div class="difference ${v.delta<0?'negative':''}"><span>差值</span><b>${signed(v.delta)}</b></div></div></summary><div class="detail-grid"><div><span>自检进场量</span><b>${fmt(v.self)}</b><small>t</small></div><div><span>外委进场量</span><b>${fmt(v.external)}</b><small>t</small></div><div><span>自检批次</span><b>${v.selfBatches}</b><small>批</small></div><div><span>外委批次</span><b>${v.externalBatches}</b><small>批</small></div></div></details>`;
+  return `<details class="material"><summary><div class="material-title"><span class="material-icon">${icon(i===0?'bag':'stone')}</span><div class="material-name">${names[i]}</div><span class="detail-action">明细 ${icon('chevron')}</span></div><div class="material-values"><div><span>累计进场</span><b>${fmt(v.incoming)}</b></div><div><span>理论消耗</span><b>${fmt(v.theory)}</b></div><div class="difference ${v.delta<0?'negative':''}"><span>差值</span><b>${signed(v.delta)}</b></div></div></summary><div class="detail-grid"><div><span>自检进场量</span><b>${fmt(v.self)}</b><small>t</small></div><div><span>外委进场量</span><b>${fmt(v.external)}</b><small>t</small></div><div><span>自检批次</span><b>${v.selfBatches}</b><small>批</small></div><div><span>外委批次</span><b>${v.externalBatches}</b><small>批</small></div></div></details>`;
 }
 function render(){
   if(!data)return;
