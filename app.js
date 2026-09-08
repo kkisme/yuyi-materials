@@ -1,6 +1,6 @@
 const ENDPOINT = 'https://yuyi-materials-api.kslk367270327.chatgpt.site/api/materials';
 const $ = s => document.querySelector(s);
-const fmt = n => new Intl.NumberFormat('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+const fmt = n => new Intl.NumberFormat('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n).replace(/(\.\d{2})$/, '<span class="decimal">$1</span>');
 const signed = n => `${n >= 0 ? '+' : '−'}${fmt(Math.abs(n))}`;
 let data, station = 'all', loading = false;
 const names = ['水泥','石屑','5–10 mm','10–20 mm','20–25 mm','20–30 mm'];
