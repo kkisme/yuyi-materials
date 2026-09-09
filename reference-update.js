@@ -1,14 +1,13 @@
 // 公开客户端只提交固定更新任务；执行凭据仅保存在云端和 NAS。
-function createReferenceUpdater(report, reread, api) {
+function createReferenceUpdater(report, reread, api, recordSuccess) {
   const endpoint='https://yuyi-materials-api.kslk367270327.chatgpt.site/api/materials-update';
-  let pending=false;
+  let pending=null;
   async function request(method,job){
     if(api)return api(method,job);
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
     try{const r=await fetch(endpoint+(job?'?job='+encodeURIComponent(job):''),{method,credentials:'omit',cache:'no-store',headers:method==='POST'?{'Content-Type':'application/json'}:{},body:method==='POST'?'{}':undefined,signal:controller.signal});const result=await r.json();if(!r.ok)throw Error(result.message||'更新服务暂不可用');return result;}finally{clearTimeout(timer);}
   }
-  return async()=>{
-    if(pending)return;pending=true;
+  async function run(){
     report('正在更新台账引用…',false);
     try{
       let result=await request('POST');const started=Date.now();
@@ -19,7 +18,8 @@ function createReferenceUpdater(report, reread, api) {
         result=await request('GET',result.job);
       }
       if(result.state!=='success')throw Error(result.message||'更新未完成，请稍后重试。');
-      report('跨表引用更新成功，正在重新读取统计…',false);
+      if(recordSuccess)recordSuccess(result.completedAt);
+      report('跨表引用已更新，正在读取自用施工台账…',false);
       const fresh=await reread(result.completedAt);
       report(fresh?'台账引用和统计已更新。':'台账引用已更新，统计暂未取得新数据，请查看读取时间。',!fresh);
       return !!fresh;
@@ -28,6 +28,13 @@ function createReferenceUpdater(report, reread, api) {
       report(error.message==='Failed to fetch'?'台账引用暂未更新，请检查网络后下拉重试。':error.message,true);
       return false;
     }
-    finally{pending=false;}
+  }
+  function update(){
+    if(!pending)pending=run().finally(()=>{pending=null;});
+    return pending;
+  }
+  update.readStatus=async()=>{
+    try{const status=await request('GET');if(status.lastSuccessAt&&recordSuccess)recordSuccess(status.lastSuccessAt);}catch{}
   };
+  return update;
 }
