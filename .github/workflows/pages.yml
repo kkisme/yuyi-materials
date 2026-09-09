@@ -22,10 +22,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Read and validate current ledger statistics
+        id: snapshot
+        continue-on-error: ${{ github.event_name == 'push' }}
         env:
           WPS_WEBHOOK: ${{ secrets.WPS_WEBHOOK }}
           WPS_TOKEN: ${{ secrets.WPS_TOKEN }}
         run: python3 scripts/snapshot.py
+      - name: Preserve deployed snapshot when releasing UI during a ledger error
+        if: steps.snapshot.outcome == 'failure' && github.event_name == 'push'
+        run: |
+          curl --fail --silent --show-error https://kkisme.github.io/yuyi-materials/data.json -o data.json
+          python3 -c "import json; from scripts.snapshot import validate; validate(json.load(open('data.json')))"
       - name: Prepare public files only
         run: |
           mkdir public
