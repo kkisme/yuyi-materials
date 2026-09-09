@@ -96,14 +96,14 @@ $('#main').addEventListener('touchmove',event=>{
   if(dy<8)return;
   if(event.cancelable)event.preventDefault();
   pullDistance=Math.min(88,dy*.5);pull.classList.add('dragging');pull.style.height=pullDistance+'px';
-  pullLabel.textContent=pullDistance>=64?'松开刷新':'下拉刷新';
+  pullLabel.textContent=pullDistance>=64?'松开更新台账':'下拉更新台账';
 },{passive:false});
 $('#main').addEventListener('touchend',async()=>{
   if(!pullStart)return;
   const ready=pullDistance>=64;pullStart=null;
   if(!ready||loading){resetPull();return;}
-  pullBusy=true;pull.classList.remove('dragging');pull.classList.add('refreshing');pull.style.height='54px';pullLabel.textContent='正在刷新…';
-  try{const ok=await refresh();pullLabel.textContent=ok?'已重新读取数据':'刷新失败，请重试';}
+  pullBusy=true;pull.classList.remove('dragging');pull.classList.add('refreshing');pull.style.height='54px';pullLabel.textContent='正在更新台账…';
+  try{const ok=await updateReferences();pullLabel.textContent=ok?'台账已更新':'引用暂未更新，详见提示';}
   finally{pull.classList.remove('refreshing');setTimeout(()=>{pullBusy=false;resetPull();},1000);}
 },{passive:true});
 $('#main').addEventListener('touchcancel',resetPull,{passive:true});
@@ -112,6 +112,6 @@ document.querySelectorAll('[data-station]').forEach(button=>button.addEventListe
 function tab(name){document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===name);if(b.dataset.tab===name)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});const water=name==='water';$('#main').hidden=!water;$('#future').hidden=water;if(!water){const label=name==='asphalt'?'沥青':'混凝土';$('#future').innerHTML=`<span class="future-icon">${icon(name==='asphalt'?'road':'cube')}</span><h1>${label}混合料</h1><p>原材消耗统计即将接入<br>当前可查看水稳原材数据</p><button id="back-water">查看水稳统计</button>`;$('#back-water').onclick=()=>tab('water');}window.scrollTo({top:0,behavior:'instant'});}
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
 try{const saved=localStorage.getItem('yuyi-materials-v1');if(saved){data=validate(JSON.parse(saved));render();$('#sync').textContent=`本地缓存 ${timeText(data.readAt)} · 正在读取最新数据`;}}catch{}
-refresh();setInterval(()=>{if(!document.hidden)refresh();},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});window.addEventListener('online',refresh);
+refresh();setInterval(()=>{if(!document.hidden&&!pullBusy)refresh();},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!pullBusy)refresh();});window.addEventListener('online',()=>{if(!pullBusy)refresh();});
 
-connectReferenceUpdate($("#reference-update"),(message,error)=>{const el=$("#update-status");el.hidden=false;el.textContent=message;el.classList.toggle("error",!!error);},refresh);
+const updateReferences=createReferenceUpdater((message,error)=>{const el=$("#update-status");el.hidden=false;el.textContent=message;el.classList.toggle("error",!!error);},refresh);
