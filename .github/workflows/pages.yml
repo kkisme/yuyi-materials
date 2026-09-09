@@ -29,7 +29,7 @@ jobs:
       - name: Prepare public files only
         run: |
           mkdir public
-          cp index.html app.js style.css data.json public/
+          cp index.html app.js reference-update.js style.css data.json public/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

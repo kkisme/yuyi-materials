@@ -60,18 +60,18 @@ function showData(payload,mode){
   $('#sync').classList.toggle('error',stale);
   $('#sync').textContent=`读取 ${timeText(data.readAt)} · ${mode==='live'?'实时台账':'备用快照'}${stale?'（已过期）':''}`;
 }
-async function refresh(){
+async function refresh(after){
   if(loading)return;loading=true;
   $('#sync').setAttribute('aria-busy','true');
   try{
     let liveSucceeded=false;
-    const live=readJSON(ENDPOINT).then(v=>{liveSucceeded=true;showData(v,'live');return v;}).catch(()=>null);
+    const live=readJSON(ENDPOINT+(typeof after==='number'?'?after='+after:'')).then(v=>{liveSucceeded=true;showData(v,'live');return v;}).catch(()=>null);
     const backup=readJSON('./data.json?t='+Date.now()).then(v=>{if(!liveSucceeded)showData(v,'snapshot');return v;}).catch(()=>null);
     const results=await Promise.all([live,backup]);
     if(results[0])showData(results[0],'live');
     else if(results[1])showData(results[1],'snapshot');
     else throw Error('两个数据通道均不可用');
-    return true;
+    return typeof after!=='number'||Date.parse(data.readAt)>=after;
   }catch{
     $('#sync').classList.add('error');
     $('#sync').textContent=data?`暂无法读取最新数据，保留 ${timeText(data.readAt)} 的结果。下拉刷新重试。`:'暂时无法读取台账，请下拉刷新重试。';
@@ -113,3 +113,5 @@ function tab(name){document.querySelectorAll('[data-tab]').forEach(b=>{b.classLi
 document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
 try{const saved=localStorage.getItem('yuyi-materials-v1');if(saved){data=validate(JSON.parse(saved));render();$('#sync').textContent=`本地缓存 ${timeText(data.readAt)} · 正在读取最新数据`;}}catch{}
 refresh();setInterval(()=>{if(!document.hidden)refresh();},60000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});window.addEventListener('online',refresh);
+
+connectReferenceUpdate($("#reference-update"),(message,error)=>{const el=$("#update-status");el.hidden=false;el.textContent=message;el.classList.toggle("error",!!error);},refresh);
